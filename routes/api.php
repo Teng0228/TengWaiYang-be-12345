@@ -13,7 +13,7 @@ Route::get ('/testing', function () {
 
 
 Route::post('/movies', [MovieController::class, 'insertMovie']);
-
+Route::post('/ratings', [MovieController::class, 'insertRating']);
 
 
 
