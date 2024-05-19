@@ -24,4 +24,9 @@ class Movie extends Model
     {
         return $this->hasOne(MovieRating::class, 'movie_title', 'title');
     }
+
+    public function theaters()
+    {
+        return $this->hasMany(Theater::class);
+    }
 }
