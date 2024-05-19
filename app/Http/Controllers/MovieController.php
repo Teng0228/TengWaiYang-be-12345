@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Movie;
 use App\Models\Rating;
+use App\Models\OverallRating;
 
 class MovieController extends Controller
 {
@@ -55,7 +56,7 @@ class MovieController extends Controller
     return response()->json(['message' => 'Movie inserted successfully'], 201);
 }
 
-public function insertRating(Request $request)
+    public function insertRating(Request $request)
     {
         // Validate incoming request
         $validatedData = $request->validate([
@@ -82,9 +83,30 @@ public function insertRating(Request $request)
         // Save the rating to the database
         $rating->save();
 
+        // Update the overall rating
+        $this->updateOverallRating($validatedData['movie_title']);
+
         // Return a response indicating success
         return response()->json(['message' => 'Rating inserted successfully'], 201);
     }
 
-    
+    public function updateOverallRating($movie_title)
+    {
+        // Get all ratings for the specified movie title
+        $ratings = Rating::where('movie_title', $movie_title)->get();
+
+        $total_ratings = $ratings->count();
+        $sum_ratings = $ratings->sum('rating');
+
+        // Calculate overall rating
+        $overall_rating = $total_ratings > 0 ? $sum_ratings / $total_ratings : 0;
+
+        // Update or create overall rating record
+        OverallRating::updateOrCreate(
+            ['movie_title' => $movie_title],
+            ['overall_rating' => $overall_rating, 'total_ratings' => $total_ratings]
+        );
+
+        return response()->json(['message' => 'Overall rating updated successfully']);
+    }
 }
