@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Movie;
 use App\Models\Rating;
+use App\Models\Theater;
 use App\Models\OverallRating;
 
 class MovieController extends Controller
@@ -51,9 +52,11 @@ class MovieController extends Controller
     // Save the movie to the database
     $movie->save();
 
+    // Compose the success message
+    $message = "Successfully added movie {$movie->title} with Movie_ID {$movie->id}";
 
     // Return a response indicating success
-    return response()->json(['message' => 'Movie inserted successfully'], 201);
+    return response()->json(['message' => $message, 'success' => true], 201);
 }
 
     public function insertRating(Request $request)
@@ -83,11 +86,11 @@ class MovieController extends Controller
         // Save the rating to the database
         $rating->save();
 
-        // Update the overall rating
-        $this->updateOverallRating($validatedData['movie_title']);
+        // Compose the success message
+        $message = "Successfully added review for {$rating->movie_title} by user: {$rating->username}";
 
         // Return a response indicating success
-        return response()->json(['message' => 'Rating inserted successfully'], 201);
+        return response()->json(['message' => $message, 'success' => true], 201);
     }
 
     public function updateOverallRating($movie_title)
@@ -109,4 +112,202 @@ class MovieController extends Controller
 
         return response()->json(['message' => 'Overall rating updated successfully']);
     }
+
+    public function getMoviesByGenre(Request $request)
+    {
+        $genre = $request->query('genre');
+    
+        // Query movies by genre and join with overall_ratings table
+        $movies = Movie::select(
+                'movies.id',
+                'movies.title',
+                'movies.length',
+                'movies.description',
+                'overall_ratings.overall_rating'
+            )
+            ->leftJoin('overall_ratings', 'movies.title', '=', 'overall_ratings.movie_title')
+            ->where('movies.genre1', $genre)
+            ->orWhere('movies.genre2', $genre)
+            ->orWhere('movies.genre3', $genre)
+            ->get();
+    
+        // Format the data
+        $formattedMovies = $movies->map(function ($movie) use ($genre) {
+            return [
+                'Movie_ID' => $movie->id,
+                'Title' => $movie->title,
+                'Genre' => $genre,
+                'Duration' => $movie->length,
+                'Overall_rating' => $movie->overall_rating ?? null,
+                'Description' => $movie->description
+            ];
+        });
+    
+        return response()->json($formattedMovies);
+    } 
+    
+    public function getMoviesByTimeSlot(Request $request)
+{
+    $theaterName = $request->query('theater_name');
+    $startTime = $request->query('time_start');
+    $endTime = $request->query('time_end');
+
+    // Query theaters based on the provided time slot and theater name
+    $theaters = Theater::select(
+            'theaters.movie_title',
+            'theaters.theater_name',
+            'theaters.theater_room_no',
+            'theaters.start_time',
+            'theaters.end_time',
+            'movies.id',
+            'movies.title',
+            'movies.length',
+            'movies.description',
+            'overall_ratings.overall_rating',
+            'movies.genre1'
+        )
+        ->leftJoin('movies', 'theaters.movie_title', '=', 'movies.title')
+        ->leftJoin('overall_ratings', 'movies.title', '=', 'overall_ratings.movie_title')
+        ->where('theaters.theater_name', $theaterName)
+        ->whereBetween('theaters.start_time', [$startTime, $endTime])
+        ->get();
+
+    // Format the data
+    $formattedMovies = $theaters->map(function ($theater) {
+        return [
+            'Movie_ID' => $theater->id,
+            'Title' => $theater->title,
+            'Duration' => $theater->length,
+            'Genre' => $theater->genre1 ?: 'Unknown',
+            'Overall_rating' => $theater->overall_rating ?? null,
+            'Theater_name' => $theater->theater_name,
+            'Start_time' => $theater->start_time,
+            'End_time' => $theater->end_time,
+            'Description' => $theater->description,
+            'Theater_room_no' => $theater->theater_room_no
+        ];
+    });
+
+    return response()->json($formattedMovies);
+}
+
+public function getSpecificMovieTheater(Request $request)
+{
+    $theaterName = $request->query('theater_name');
+    $date = $request->query('d_date');
+
+    // Query theaters based on the provided theater name and date
+    $theaters = Theater::select(
+            'theaters.movie_title',
+            'theaters.theater_name',
+            'theaters.theater_room_no',
+            'theaters.start_time',
+            'theaters.end_time',
+            'movies.id',
+            'movies.title',
+            'movies.length',
+            'movies.description',
+            'overall_ratings.overall_rating',
+            'movies.genre1'
+        )
+        ->leftJoin('movies', 'theaters.movie_title', '=', 'movies.title')
+        ->leftJoin('overall_ratings', 'movies.title', '=', 'overall_ratings.movie_title')
+        ->where('theaters.theater_name', $theaterName)
+        ->whereDate('theaters.start_time', $date)
+        ->get();
+
+    // Format the data
+    $formattedMovies = $theaters->map(function ($theater) {
+        return [
+            'Movie_ID' => $theater->id,
+            'Title' => $theater->title,
+            'Duration' => $theater->length,
+            'Genre' => $theater->genre1 ?: 'Unknown',
+            'Overall_rating' => $theater->overall_rating ?? null,
+            'Theater_name' => $theater->theater_name,
+            'Start_time' => $theater->start_time,
+            'End_time' => $theater->end_time,
+            'Description' => $theater->description,
+            'Theater_room_no' => $theater->theater_room_no
+        ];
+    });
+
+    return response()->json($formattedMovies);
+}
+
+public function searchPerformer(Request $request)
+{
+    $performerName = $request->query('performer_name');
+
+    // Query movies featuring the provided performer
+    $movies = Movie::select(
+            'movies.id',
+            'movies.title',
+            'movies.length',
+            'movies.description',
+            'overall_ratings.overall_rating',
+            'movies.genre1',
+            'movies.performer1',
+            'movies.performer2',
+            'movies.performer3'
+        )
+        ->leftJoin('overall_ratings', 'movies.title', '=', 'overall_ratings.movie_title')
+        ->where(function($query) use ($performerName) {
+            $query->where('performer1', 'like', '%'.$performerName.'%')
+                  ->orWhere('performer2', 'like', '%'.$performerName.'%')
+                  ->orWhere('performer3', 'like', '%'.$performerName.'%');
+        })
+        ->get();
+
+    // Format the data
+    $formattedMovies = $movies->map(function ($movie) {
+        return [
+            'Movie_ID' => $movie->id,
+            'Overall_rating' => $movie->overall_rating ?? null,
+            'Title' => $movie->title,
+            'Description' => $movie->description,
+            'Duration' => $movie->length,
+            'Genre' => $movie->genre1 ?: 'Unknown',
+            'Performer1' => $movie->performer1,
+            'Performer2' => $movie->performer2,
+            'Performer3' => $movie->performer3,
+        ];
+    });
+
+    return response()->json($formattedMovies);
+}
+
+public function getNewMovies(Request $request)
+{
+    $releaseDate = $request->query('r_date');
+
+    // Query movies released before the provided date
+    $movies = Movie::select(
+            'movies.id',
+            'movies.title',
+            'movies.length',
+            'movies.description',
+            'overall_ratings.overall_rating',
+            'movies.genre1'
+        )
+        ->leftJoin('overall_ratings', 'movies.title', '=', 'overall_ratings.movie_title')
+        ->whereDate('movies.release', '<', $releaseDate)
+        ->get();
+
+    // Format the data
+    $formattedMovies = $movies->map(function ($movie) {
+        return [
+            'Movie_ID' => $movie->id,
+            'Title' => $movie->title,
+            'Genre' => $movie->genre1 ?: 'Unknown',
+            'Duration' => $movie->length,
+            'Overall_rating' => $movie->overall_rating ?? null,
+            'Description' => $movie->description
+        ];
+    });
+
+    return response()->json($formattedMovies);
+}
+
+    
 }

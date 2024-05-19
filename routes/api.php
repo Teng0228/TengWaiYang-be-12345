@@ -26,3 +26,5 @@ Route::post('/theaters', [TheaterController::class, 'insertTheater']);
 
 
 
+
+
